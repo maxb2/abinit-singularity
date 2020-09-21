@@ -1,0 +1,71 @@
+# Copyright (c) 2020 Intel Corporation.
+# SPDX-License-Identifier: BSD-3-Clause
+
+Bootstrap: docker
+From: intel/oneapi-hpckit:devel-ubuntu18.04
+
+Stage: build
+
+%files
+  build-config.ac /usr/local/src/build-config.ac
+
+%environment
+  MPI_PROCS=1
+
+%post
+  # Build-time variables
+  ABINIT_VERSION=8.10.3
+  MAKE_PROCS=4
+  MPI_PROCS=4
+  PY_THREADS=1
+
+  # Install dependencies
+  apt-get update
+  apt-get install -y curl build-essential
+  ### Add Intel repos
+  # curl https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS-2019.PUB | apt-key add -
+  # curl https://apt.repos.intel.com/setup/intelproducts.list -o /etc/apt/sources.list.d/intelproducts.list
+  apt-get update
+  apt-get install -y
+  python python-dev \
+  g++-8 gcc-8 gfortran
+
+  # Set environment variables for MKL and Intel MPI
+  MKLVARS_ARCHITECTURE=intel64 . /opt/intel/mkl/bin/mklvars.sh
+  . /opt/intel/compilers_and_libraries_2020.2.254/linux/mpi/intel64/bin/mpivars.sh
+  export F95ROOT=/opt/intel/mkl
+
+  # # Build fftw3-mkl library
+  # (cd /opt/intel/compilers_and_libraries_2020.2.254/linux/mkl/interfaces/fftw3xc && make libintel64 compiler=gnu)
+
+  # Fetch abinit-8.10.3
+  cd /usr/local/src
+  curl -RLO https://www.abinit.org/sites/default/files/packages/abinit-${ABINIT_VERSION}.tar.gz
+  tar -xvzf abinit-${ABINIT_VERSION}.tar.gz
+  mv abinit-${ABINIT_VERSION} abinit
+
+  # Compile abinit
+  mkdir -p abinit/build
+  mv build-config.ac abinit/build/
+  cd abinit/build
+  ../configure --with-config-file=build-config.ac
+  make -j${MAKE_PROCS}
+
+  # Test build
+  make check
+  cd ../tests
+  ./runtests.py -j ${PY_THREADS} -n ${MPI_PROCS} -b ../build
+
+  # Install
+  make install
+
+%runscript
+  . /opt/intel/compilers_and_libraries_2020.2.254/linux/mpi/intel64/bin/mpivars.sh
+  mpirun -n ${MPI_PROCS} abinit $*
+
+
+%labels
+  Author Matthew Anderson
+  Email maxb2@mail.missouri.edu
+  Source https://github.com/maxb2/abinit-singularity
+  Version v0.0.1
