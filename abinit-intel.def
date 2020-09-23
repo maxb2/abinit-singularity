@@ -1,0 +1,57 @@
+# Copyright (c) 2020 Intel Corporation.
+# SPDX-License-Identifier: BSD-3-Clause
+
+Bootstrap: docker
+From: intel/oneapi-hpckit:devel-ubuntu18.04
+
+
+Stage: build
+
+%files
+  build-config.ac9 /opt/build-config.ac9
+
+%environment
+  MPI_PROCS=1
+
+%post
+  # Build-time variables
+  ABINIT_VERSION=9.0.4
+  MAKE_PROCS=4
+  MPI_PROCS=4
+  PY_THREADS=1
+
+  apt-get install -y curl m4 zlib1g-dev
+
+  # Fetch abinit-8.10.3
+  cd /opt
+  curl -RLO https://www.abinit.org/sites/default/files/packages/abinit-${ABINIT_VERSION}.tar.gz
+  tar -xvzf abinit-${ABINIT_VERSION}.tar.gz
+  mv abinit-${ABINIT_VERSION} abinit
+
+  # Compile abinit
+  mkdir -p abinit/build
+  mv build-config.ac9 abinit/build/
+  cd abinit/build
+  ../configure --with-config-file=build-config.ac9 || true
+  cd fallbacks
+  ./build-abinit-fallbacks.sh
+  cd ..
+  ../configure --with-config-file=build-config.ac9
+  make -j${MAKE_PROCS}
+
+  # Test build
+  #make check
+  #cd ../tests
+  #./runtests.py -j ${PY_THREADS} -n ${MPI_PROCS} -b ../build
+
+  # Install
+  make install
+
+%runscript
+  mpirun -n ${MPI_PROCS} abinit $*
+
+%labels
+  Author Matthew Anderson
+  Email maxb2@mail.missouri.edu
+  Source https://github.com/maxb2/abinit-singularity
+  Version v0.0.1
