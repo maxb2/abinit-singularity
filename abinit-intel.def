@@ -7,9 +7,6 @@ From: intel/oneapi-hpckit:devel-ubuntu18.04
 
 Stage: build
 
-%files
-  build-config.ac9 /opt/build-config.ac9
-
 %environment
   MPI_PROCS=1
 
@@ -30,13 +27,28 @@ Stage: build
 
   # Compile abinit
   mkdir -p abinit/build
-  mv build-config.ac9 abinit/build/
+  #mv build-config.ac9 abinit/build/
   cd abinit/build
-  ../configure --with-config-file=build-config.ac9 || true
+  FC='mpiifort' CC='mpiicc' CXX='mpiicpc' ../configure --with-mpi="yes" \
+  --with-linalg-flavor="mkl" \
+  --with-fft-flavor="dfti" || true
+
   cd fallbacks
   ./build-abinit-fallbacks.sh
+
   cd ..
-  ../configure --with-config-file=build-config.ac9
+  FC='mpiifort' CC='mpiicc' CXX='mpiicpc' H5CC="/opt/abinit/build/fallbacks/install_fb/intel/2021.1/hdf5/1.10.6/bin/h5pcc" \
+  ../configure --with-mpi="yes" \
+  --with-linalg-flavor="mkl" \
+  --with-fft-flavor="dfti" \
+  --with-libxc='/opt/abinit/build/fallbacks/install_fb/intel/2021.1/libxc/default' \
+  --with-hdf5='/opt/abinit/build/fallbacks/install_fb/intel/2021.1/hdf5/default' \
+  --with-netcdf='/opt/abinit/build/fallbacks/install_fb/intel/2021.1/netcdf4/default' \
+  --with-netcdf-fortran='/opt/abinit/build/fallbacks/install_fb/intel/2021.1/netcdf4_fortran/default'
+
+
+
+
   make -j${MAKE_PROCS}
 
   # Test build
